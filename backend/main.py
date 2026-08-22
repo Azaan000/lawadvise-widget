@@ -79,7 +79,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # a specific, known-good free instruct model avoids that. Swap this for any
 # other free model slug from https://openrouter.ai/models?max_price=0 if
 # needed — just keep it a plain instruct model, not a reasoning/"thinking" one.
-MODEL = "openrouter/free"
+MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
 CONTACT_NUMBERS = "03003029093 / 03332454111"   # for immediate/urgent phone assistance only
 WHATSAPP_NUMBER = "+92 335 1340999"              # WhatsApp booking bot — used for consultations
@@ -321,8 +321,15 @@ CANNED_REPLIES: dict[str, tuple[str, str]] = {
 def _normalize(text: str) -> str:
     # Strips the leading emoji on the button labels ("🚀 Start a New Business")
     # along with punctuation/case, so both the button tap and a user retyping
-    # the same phrase match the same entry.
-    return re.sub(r"[^\w\s]", "", text).strip().lower()
+    # the same phrase match the same entry. Punctuation like "/" is replaced
+    # with a space (not deleted) and runs of whitespace are then collapsed —
+    # otherwise a label such as "Online Marriage / Nikah" loses the "/" but
+    # keeps the surrounding double space ("online marriage  nikah"), which
+    # never matches the single-spaced dict key and silently falls through to
+    # the LLM instead of the canned reply.
+    text = re.sub(r"[^\w\s]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip().lower()
 
 
 def _match_canned_reply(user_text: str) -> tuple[str, str] | None:
