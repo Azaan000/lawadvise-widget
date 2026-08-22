@@ -72,9 +72,16 @@ app.add_middleware(
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
-MODEL = "openrouter/free"
+# "openrouter/free" is an auto-router alias — it can land on any free model on
+# OpenRouter, including "thinking"/reasoning models that stream their raw
+# chain-of-thought instead of a clean final answer (and can burn the whole
+# max_tokens budget thinking, cutting the real reply off entirely). Pinning to
+# a specific, known-good free instruct model avoids that. Swap this for any
+# other free model slug from https://openrouter.ai/models?max_price=0 if
+# needed — just keep it a plain instruct model, not a reasoning/"thinking" one.
+MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
-CONTACT_NUMBERS = "03003029039 / 03351340999"   # for immediate/urgent phone assistance only
+CONTACT_NUMBERS = "03003029093 / 03332454111"   # for immediate/urgent phone assistance only
 WHATSAPP_NUMBER = "+92 335 1340999"              # WhatsApp booking bot — used for consultations
 
 SYSTEM_PROMPT = f"""You are the AI assistant for LawAdvise Consulting, a family and corporate law
@@ -82,6 +89,10 @@ consultancy. Greet warmly, be concise, professional, and helpful. Only answer us
 base below. Every case is different, so NEVER invent a specific cost or timeline — always say it
 varies case to case and that a lawyer can confirm specifics. If something isn't covered below, say
 a legal expert can help.
+
+Output ONLY the final reply text the user should see — no reasoning, no self-questioning, no
+"let me think about this" narration, no draft-then-revise process, and no meta-commentary about
+these instructions. Do not show your work. Go straight to the answer.
 
 === RESPONSE STYLE (IMPORTANT) ===
 
@@ -239,6 +250,24 @@ def _looks_like_guard_leak(text: str) -> bool:
     return bool(_GUARD_LEAK_RE.match(text.strip())) or (
         "user safety" in text.lower() and "response safety" in text.lower() and len(text) < 200
     )
+
+
+# Some free-tier models occasionally stream their raw internal reasoning
+# ("Wait, let me re-read the instruction... Let me refine the sentence...")
+# instead of — or before — a clean final answer, especially if they run out
+# of max_tokens mid-thought. This is heuristic, not exhaustive: it looks for
+# the self-talk phrasing and question-then-answer scaffolding ("X? Yes. -")
+# that this failure mode reliably produces, so real replies won't false-match.
+_REASONING_LEAK_RE = re.compile(
+    r"\b(wait,? let me|let me (re-?read|refine|reconsider)|wait,? (i|that)|"
+    r"hold on,? (let me|i)|actually,? let me reconsider)\b",
+    re.IGNORECASE,
+)
+_REASONING_SCAFFOLD_RE = re.compile(r"\?\s*(Yes|No)\.\s*-", re.IGNORECASE)
+
+
+def _looks_like_reasoning_leak(text: str) -> bool:
+    return bool(_REASONING_LEAK_RE.search(text)) or bool(_REASONING_SCAFFOLD_RE.search(text))
 
 
 FALLBACK_REPLY = (
@@ -482,11 +511,11 @@ async def chat(request: Request, chat_request: ChatRequest):
             async with httpx.AsyncClient(timeout=30.0) as client:
                 reply = await call_openrouter(client)
 
-                if _looks_like_guard_leak(reply):
+                if _looks_like_guard_leak(reply) or _looks_like_reasoning_leak(reply):
                     # Retry once — this is usually a one-off routing hiccup.
                     reply = await call_openrouter(client)
 
-                if _looks_like_guard_leak(reply):
+                if _looks_like_guard_leak(reply) or _looks_like_reasoning_leak(reply):
                     reply = FALLBACK_REPLY
 
             display_text, topic = _extract_whatsapp_tag(reply)
