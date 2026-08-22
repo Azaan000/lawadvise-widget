@@ -79,7 +79,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # a specific, known-good free instruct model avoids that. Swap this for any
 # other free model slug from https://openrouter.ai/models?max_price=0 if
 # needed — just keep it a plain instruct model, not a reasoning/"thinking" one.
-MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+MODEL = "openrouter/free"
 
 CONTACT_NUMBERS = "03003029093 / 03332454111"   # for immediate/urgent phone assistance only
 WHATSAPP_NUMBER = "+92 335 1340999"              # WhatsApp booking bot — used for consultations
