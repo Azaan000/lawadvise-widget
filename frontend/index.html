@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LawAdvise Consulting — AI Assistant</title>
+  <style>
+    /* ── Demo page styles (optional — remove if embedding into an existing site) ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a1a2e;
+    }
+    .demo-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 3rem 3.5rem;
+      max-width: 520px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 4px 40px rgba(0,0,0,0.08);
+    }
+    .demo-card h1 { font-size: 1.7rem; font-weight: 700; margin-bottom: 0.75rem; }
+    .demo-card p { color: #6b7280; line-height: 1.6; font-size: 0.95rem; }
+    .badge {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 1.25rem;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── Widget styles ── */
+    #support-widget-root {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 9999;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    /* Bubble button */
+    #sw-bubble {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #03244f, #ea963e);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(234,150,62,0.45);
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-left: auto;
+    }
+    #sw-bubble:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(234,150,62,0.55); }
+    #sw-bubble svg { width: 26px; height: 26px; fill: #fff; transition: opacity 0.2s; }
+    #sw-bubble .icon-close { display: none; }
+
+    /* Unread dot */
+    #sw-dot {
+      width: 11px; height: 11px;
+      background: #ff3b30;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      position: absolute;
+      top: 2px; right: 2px;
+    }
+
+    /* Chat panel */
+    #sw-panel {
+      position: absolute;
+      bottom: 72px;
+      right: 0;
+      width: 360px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.16);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform-origin: bottom right;
+      transform: scale(0.85) translateY(12px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), opacity 0.2s;
+      max-height: 520px;
+    }
+    #sw-panel.open {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Header */
+    #sw-header {
+      background: linear-gradient(135deg, #03244f, #ea963e);
+      padding: 16px 18px 14px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sw-avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    #sw-header h2 { font-size: 0.95rem; font-weight: 600; margin: 0; }
+    #sw-header p  { font-size: 0.75rem; opacity: 0.85; margin: 2px 0 0; }
+    .sw-online-dot {
+      width: 8px; height: 8px;
+      background: #4caf50;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    /* Messages */
+    #sw-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #f9fafb;
+    }
+    #sw-messages::-webkit-scrollbar { width: 4px; }
+    #sw-messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+    .sw-msg {
+      max-width: 82%;
+      padding: 9px 13px;
+      border-radius: 14px;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      word-break: break-word;
+      animation: sw-pop 0.2s ease;
+    }
+    @keyframes sw-pop { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+    .sw-msg.bot {
+      background: #fff;
+      color: #1a1a2e;
+      border: 1px solid #e5e7eb;
+      border-bottom-left-radius: 4px;
+      align-self: flex-start;
+    }
+    .sw-msg.user {
+      background: #ea963e;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      align-self: flex-end;
+    }
+    .sw-msg-time {
+      font-size: 0.6rem;
+      opacity: 0.6;
+      display: block;
+      margin-top: 3px;
+    }
+    .sw-typing {
+      display: flex; gap: 5px; align-items: center;
+      padding: 10px 14px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      border-bottom-left-radius: 4px;
+      align-self: flex-start;
+      width: fit-content;
+    }
+    .sw-typing span {
+      width: 7px; height: 7px;
+      background: #9ca3af;
+      border-radius: 50%;
+      animation: sw-bounce 1.2s infinite;
+    }
+    .sw-typing span:nth-child(2) { animation-delay: 0.2s; }
+    .sw-typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes sw-bounce {
+      0%,60%,100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+
+    /* Input area */
+    #sw-footer {
+      padding: 10px 12px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      background: #fff;
+    }
+    #sw-input {
+      flex: 1;
+      border: 1px solid #e5e7eb;
+      border-radius: 22px;
+      padding: 9px 14px;
+      font-size: 16px; /* must stay >=16px or iOS Safari auto-zooms the page on focus */
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      max-height: 100px;
+      line-height: 1.4;
+      transition: border-color 0.15s;
+      background: #f9fafb;
+      color: #1a1a2e;
+    }
+    #sw-input:focus { border-color: #ea963e; background: #fff; }
+    #sw-send {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: #ea963e;
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, transform 0.15s;
+    }
+    #sw-send:hover { background: #c97b2e; transform: scale(1.05); }
+    #sw-send:disabled { background: #d1d5db; cursor: not-allowed; transform: none; }
+    #sw-send svg { width: 17px; height: 17px; fill: #fff; }
+
+    /* Suggested replies */
+    #sw-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 12px 10px;
+      background: #fff;
+    }
+    .sw-suggestion {
+      font-size: 0.78rem;
+      padding: 5px 11px;
+      border-radius: 20px;
+      border: 1px solid #ea963e;
+      color: #ea963e;
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      font-family: inherit;
+    }
+    .sw-suggestion:hover { background: #ea963e; color: #fff; }
+
+    .sw-whatsapp-cta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      max-width: 80%;
+      margin: 6px 0 12px;
+      padding: 9px 14px;
+      background: #25D366;
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 18px;
+      text-decoration: none;
+      box-shadow: 0 2px 6px rgba(37,211,102,0.35);
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .sw-whatsapp-cta:hover { background: #1ebe57; transform: translateY(-1px); }
+    .sw-whatsapp-cta svg { flex-shrink: 0; }
+
+    .sw-retry-btn {
+      background: none;
+      border: 1px solid #ea963e;
+      border-radius: 12px;
+      padding: 2px 10px;
+      cursor: pointer;
+      color: #ea963e;
+      font-size: 0.78rem;
+      margin-left: 6px;
+      font-family: inherit;
+    }
+    .sw-retry-btn:hover { background: #ea963e; color: #fff; }
+
+    @media (max-width: 420px) {
+      #sw-panel {
+        width: calc(100vw - 24px);
+        right: -14px;
+        /* dvh shrinks with the on-screen keyboard so the panel (and its input)
+           stays visible instead of being pushed/hidden behind the keyboard. */
+        max-height: min(520px, 80dvh);
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Demo page content — remove this <div> when embedding on a real site -->
+<div class="demo-card">
+  <img src="lawadvise-logo.png" alt="LawAdvise Consulting" style="width:90px; margin-bottom:1rem;" onerror="this.style.display='none'" />
+  <div class="badge">✦ AI Powered</div>
+  <h1>LawAdvise Consulting</h1>
+  <p>Click the chat bubble in the bottom-right corner to ask about marriage, divorce, child custody, property, inheritance, corporate law, or legal documentation.</p>
+  <br/>
+  <p style="font-size:0.82rem; color:#9ca3af;">Powered by Llama 3 via OpenRouter · Built with FastAPI</p>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     WIDGET — paste everything below into your site
+═══════════════════════════════════════════ -->
+
+<!-- 1. Configuration (set this BEFORE the widget script, values here are just examples) -->
+<script>
+  window.WIDGET_CONFIG = {
+    apiUrl: "https://lawadvise-widget-production.up.railway.app/chat",   // your deployed backend URL + /chat
+    whatsappNumber: "923351340999",          // wa.me format: country code + number, no + or leading 0
+    widgetKey: "azan123"                             // must match WIDGET_SHARED_SECRET on the backend, if set
+  };
+</script>
+
+<div id="support-widget-root">
+  <!-- Notification dot -->
+  <div id="sw-dot"></div>
+
+  <!-- Chat panel -->
+  <div id="sw-panel" role="dialog" aria-label="Customer support chat">
+    <div id="sw-header">
+      <div class="sw-avatar"><img src="lawadvise-logo.png" alt="LawAdvise" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" onerror="this.parentElement.textContent='⚖️'" /></div>
+      <div>
+        <h2>LawAdvise Consulting</h2>
+        <p><span class="sw-online-dot"></span>Online · Usually replies instantly</p>
+      </div>
+    </div>
+
+    <div id="sw-messages" aria-live="polite">
+      <!-- Seeded welcome message -->
+      <div class="sw-msg bot">👋 Welcome to LawAdvise Consulting! How can we assist you today? Ask me about marriage, divorce, child custody, property, inheritance, corporate law, or legal documentation — or tap a quick option below.</div>
+    </div>
+
+    <div id="sw-suggestions">
+      <button class="sw-suggestion" onclick="sendSuggestion(this)">🕌 Online Marriage / Nikah</button>
+      <button class="sw-suggestion" onclick="sendSuggestion(this)">💍 Court Marriage</button>
+      <button class="sw-suggestion" onclick="sendSuggestion(this)">📄 Divorce / Khula</button>
+      <button class="sw-suggestion" onclick="sendSuggestion(this)">👶 Child Custody</button>
+      <button class="sw-suggestion" onclick="sendSuggestion(this)">🏠 Property Law</button>
+      <button class="sw-suggestion" onclick="sendSuggestion(this)">👨‍⚖️ Talk to a Lawyer</button>
+    </div>
+
+    <div id="sw-footer">
+      <textarea id="sw-input" rows="1" placeholder="Type your message…" aria-label="Chat message"></textarea>
+      <button id="sw-send" aria-label="Send message" disabled>
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Bubble toggle button -->
+  <button id="sw-bubble" aria-label="Open support chat">
+    <svg class="icon-chat" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+    </svg>
+    <svg class="icon-close" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    </svg>
+  </button>
+</div>
+
+<!-- 2. Widget script -->
+<script>
+  (function () {
+    const CFG = window.WIDGET_CONFIG || {};
+    const API_URL = CFG.apiUrl || "http://localhost:8000/chat";
+    const WHATSAPP_NUMBER = CFG.whatsappNumber || "923351340999";
+    const WIDGET_KEY = CFG.widgetKey || "";
+    const MAX_HISTORY = 10; // messages sent to backend — kept short so the model has fewer input tokens to chew through before it can start replying
+
+    const bubble   = document.getElementById("sw-bubble");
+    const panel    = document.getElementById("sw-panel");
+    const messages = document.getElementById("sw-messages");
+    const input    = document.getElementById("sw-input");
+    const sendBtn  = document.getElementById("sw-send");
+    const dot      = document.getElementById("sw-dot");
+    const sugBox   = document.getElementById("sw-suggestions");
+
+    let isOpen    = false;
+    let isLoading = false;
+    let history   = []; // [{role, content}] — content here is always the DISPLAY text (tag stripped)
+
+    // ── Lead attribution ──────────────────────────────────────────────────
+    // A short random ID for this browser tab's chat session, so a WhatsApp
+    // lead can be correlated back to "which website visit" if needed later.
+    const SESSION_ID = Math.random().toString(36).slice(2, 8).toUpperCase();
+
+    // Pull utm_* params from the current page URL (set by ad campaigns) so we
+    // know not just "came from the website" but which campaign/source drove it.
+    function getUtmParams() {
+      const params = new URLSearchParams(window.location.search);
+      const utm = {};
+      ["utm_source", "utm_medium", "utm_campaign"].forEach(key => {
+        const val = params.get(key);
+        if (val) utm[key] = val;
+      });
+      return utm;
+    }
+
+    // Page URL WITHOUT the query string — avoids leaking any sensitive/unrelated
+    // tokens that might be in the querystring straight into a WhatsApp message.
+    // UTM params (if present) are called out explicitly and separately below.
+    function getCleanPageUrl() {
+      return window.location.origin + window.location.pathname;
+    }
+
+    // Toggle panel
+    bubble.addEventListener("click", () => {
+      isOpen = !isOpen;
+      panel.classList.toggle("open", isOpen);
+      bubble.querySelector(".icon-chat").style.display  = isOpen ? "none"  : "block";
+      bubble.querySelector(".icon-close").style.display = isOpen ? "block" : "none";
+      dot.style.display = "none";
+      if (isOpen) {
+        setTimeout(() => input.focus(), 100);
+        scrollBottom();
+      }
+    });
+
+    // Auto-resize textarea
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 100) + "px";
+      sendBtn.disabled = input.value.trim() === "" || isLoading;
+    });
+
+    // Send on Enter (Shift+Enter = newline)
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    sendBtn.addEventListener("click", send);
+
+    function sendSuggestion(btn) {
+      input.value = btn.textContent;
+      sugBox.style.display = "none";
+      send();
+    }
+    window.sendSuggestion = sendSuggestion;
+
+    // Add message to UI. text/whatsappTopic are already-sanitized display strings —
+    // textContent is used below so no HTML injection is possible even with untrusted text.
+    function addMessage(role, text, whatsappTopic) {
+      const div = document.createElement("div");
+      div.className = `sw-msg ${role}`;
+      div.textContent = text;
+      appendMsgTime(div);
+      messages.appendChild(div);
+      if (whatsappTopic) appendWhatsappCta(whatsappTopic);
+      scrollBottom();
+      return div;
+    }
+
+    function appendMsgTime(div) {
+      const time = document.createElement("span");
+      time.className = "sw-msg-time";
+      time.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      div.appendChild(time);
+    }
+
+    function appendWhatsappCta(whatsappTopic) {
+      // Build the prefilled WhatsApp message: topic, clean page URL (no query
+      // string), any utm_* attribution params, and a short session ID — all
+      // visible right in the chat, no backend lookup needed.
+      let waText = `Hi, I'm interested in: ${whatsappTopic}\n(via ${getCleanPageUrl()})`;
+      const utm = getUtmParams();
+      const utmParts = Object.entries(utm).map(([k, v]) => `${k}=${v}`);
+      if (utmParts.length) waText += `\n${utmParts.join(" ")}`;
+      waText += `\nref: ${SESSION_ID}`;
+      const encodedText = encodeURIComponent(waText);
+      const link = document.createElement("a");
+      link.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedText}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.className = "sw-whatsapp-cta";
+      link.setAttribute("role", "button");
+      link.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12.04 2c-5.52 0-10 4.48-10 10 0 1.77.46 3.45 1.27 4.9L2 22l5.25-1.38a9.94 9.94 0 0 0 4.79 1.22h.01c5.52 0 10-4.48 10-10s-4.49-9.84-10.01-9.84zm0 18.15a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 4.54 0 8.24 3.7 8.24 8.25 0 4.55-3.7 8.23-8.25 8.23zm4.52-6.17c-.25-.12-1.47-.72-1.7-.81-.23-.08-.4-.12-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.39-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43-.14-.01-.31-.01-.48-.01-.17 0-.43.06-.66.31s-.87.85-.87 2.08.89 2.41 1.02 2.58c.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg> Continue on WhatsApp`;
+      messages.appendChild(link);
+    }
+
+    // ── Streaming bot message helpers ───────────────────────────────────────
+    // The bot's reply now arrives as a series of text chunks over SSE instead
+    // of one JSON blob, so the message div gets created empty and filled in
+    // as chunks land (visible progress instead of a blank wait behind the
+    // typing indicator).
+    function createBotMessageDiv() {
+      const div = document.createElement("div");
+      div.className = "sw-msg bot";
+      messages.appendChild(div);
+      scrollBottom();
+      return div;
+    }
+
+    function finalizeBotMessage(div, whatsappTopic) {
+      appendMsgTime(div);
+      if (whatsappTopic) appendWhatsappCta(whatsappTopic);
+      scrollBottom();
+    }
+
+    function showTyping() {
+      const t = document.createElement("div");
+      t.className = "sw-typing";
+      t.id = "sw-typing-indicator";
+      t.setAttribute("aria-label", "Bot is typing");
+      t.innerHTML = "<span></span><span></span><span></span>";
+      messages.appendChild(t);
+      scrollBottom();
+    }
+
+    function hideTyping() {
+      const t = document.getElementById("sw-typing-indicator");
+      if (t) t.remove();
+    }
+
+    function scrollBottom() {
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    // POST /chat and read the text/event-stream response, invoking onChunk for
+    // each "chunk" event and onWhatsapp for the (at most one) "whatsapp" event.
+    // Resolves once a "done" event is seen; throws on a network error, non-2xx
+    // status, an "error" event from the backend, or a stream that ends without
+    // ever sending "done" (e.g. connection dropped mid-reply).
+    async function streamChat(payloadMessages, onChunk, onWhatsapp) {
+      const headers = { "Content-Type": "application/json" };
+      if (WIDGET_KEY) headers["X-Widget-Key"] = WIDGET_KEY;
+
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ messages: payloadMessages }),
+      });
+      if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let sawDone = false;
+      let serverError = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE events are separated by a blank line; each event is one or more
+        // "field: value" lines (we only emit "event:" and "data:").
+        let idx;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+
+          let eventName = "message";
+          let dataStr = "";
+          for (const line of rawEvent.split("\n")) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+          }
+          if (!dataStr) continue;
+
+          let data;
+          try { data = JSON.parse(dataStr); } catch { continue; }
+
+          if (eventName === "chunk" && data.text) onChunk(data.text);
+          else if (eventName === "whatsapp" && data.topic) onWhatsapp(data.topic);
+          else if (eventName === "error") serverError = data.detail || "Stream error";
+          else if (eventName === "done") sawDone = true;
+        }
+      }
+
+      if (serverError) throw new Error(serverError);
+      if (!sawDone) throw new Error("Stream ended unexpectedly");
+    }
+
+    async function send() {
+      const text = input.value.trim();
+      if (!text || isLoading) return;
+
+      input.value = "";
+      input.style.height = "auto";
+      sendBtn.disabled = true;
+      sugBox.style.display = "none";
+      isLoading = true;
+
+      history.push({ role: "user", content: text });
+      addMessage("user", text);
+      showTyping();
+
+      // Only send the last N messages to keep payload/token size bounded.
+      const payloadMessages = history.slice(-MAX_HISTORY);
+      const MAX_ATTEMPTS = 2; // one retry on failure, same as before streaming
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        let botDiv = null;
+        let displayText = "";
+        let whatsappTopic = null;
+
+        try {
+          await streamChat(
+            payloadMessages,
+            (chunkText) => {
+              if (!botDiv) {
+                hideTyping();
+                botDiv = createBotMessageDiv();
+              }
+              displayText += chunkText;
+              botDiv.textContent = displayText;
+              scrollBottom();
+            },
+            (topic) => { whatsappTopic = topic; }
+          );
+
+          hideTyping();
+          // Only the tag-stripped displayText goes into history — the model
+          // never sees its own raw tag echoed back to it on the next turn.
+          history.push({ role: "assistant", content: displayText });
+          if (botDiv) finalizeBotMessage(botDiv, whatsappTopic);
+          break;
+        } catch (err) {
+          hideTyping();
+          if (botDiv) botDiv.remove(); // don't leave a half-written reply on screen
+
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+
+          const errDiv = document.createElement("div");
+          errDiv.className = "sw-msg bot";
+          errDiv.textContent = "⚠️ Sorry, I couldn't connect. ";
+          const retryBtn = document.createElement("button");
+          retryBtn.className = "sw-retry-btn";
+          retryBtn.textContent = "Retry";
+          retryBtn.onclick = retryLastMessage;
+          errDiv.appendChild(retryBtn);
+          messages.appendChild(errDiv);
+          scrollBottom();
+          console.error("Widget error:", err);
+        }
+      }
+
+      isLoading = false;
+      sendBtn.disabled = input.value.trim() === "";
+    }
+
+    // Retry the last user message (removes the error and re-sends)
+    async function retryLastMessage() {
+      const lastMsg = messages.lastElementChild;
+      if (lastMsg && lastMsg.classList.contains("sw-msg") && lastMsg.textContent.includes("couldn't connect")) {
+        lastMsg.remove();
+      }
+      const lastUserMsg = [...history].reverse().find(m => m.role === "user");
+      if (lastUserMsg) {
+        // Remove it from history (it'll be re-added by send()) to avoid duplication
+        const idx = history.lastIndexOf(lastUserMsg);
+        if (idx !== -1) history.splice(idx, 1);
+
+        const userDivs = messages.querySelectorAll(".sw-msg.user");
+        if (userDivs.length) userDivs[userDivs.length - 1].remove();
+
+        input.value = lastUserMsg.content;
+        send();
+      }
+    }
+  })();
+</script>
+<!-- ═══════════════════════════════════════════
+     End of widget embed code
+═══════════════════════════════════════════ -->
+
+</body>
+</html>
