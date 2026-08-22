@@ -74,7 +74,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 MODEL = "openrouter/free"
 
-CONTACT_NUMBERS = "03003029039 / 03332454111"   # for immediate/urgent phone assistance only
+CONTACT_NUMBERS = "03003029039 / 03351340999"   # for immediate/urgent phone assistance only
 WHATSAPP_NUMBER = "+92 335 1340999"              # WhatsApp booking bot — used for consultations
 
 SYSTEM_PROMPT = f"""You are the AI assistant for LawAdvise Consulting, a family and corporate law
